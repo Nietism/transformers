@@ -35,10 +35,12 @@ from typing import Iterator, List, Optional, Union
 from unittest import mock
 
 import huggingface_hub
+
 from transformers import logging as transformers_logging
 
 from .deepspeed import is_deepspeed_available
 from .integrations import (
+    is_clearml_available,
     is_fairscale_available,
     is_optuna_available,
     is_ray_available,
@@ -50,13 +52,17 @@ from .utils import (
     is_apex_available,
     is_bitsandbytes_available,
     is_bs4_available,
+    is_cython_available,
+    is_decord_available,
     is_detectron2_available,
     is_faiss_available,
     is_flax_available,
     is_ftfy_available,
     is_ipex_available,
     is_jumanpp_available,
+    is_keras_nlp_available,
     is_librosa_available,
+    is_natten_available,
     is_onnx_available,
     is_pandas_available,
     is_phonemizer_available,
@@ -79,11 +85,13 @@ from .utils import (
     is_torch_available,
     is_torch_bf16_cpu_available,
     is_torch_bf16_gpu_available,
+    is_torch_neuroncore_available,
     is_torch_tensorrt_fx_available,
     is_torch_tf32_available,
     is_torch_tpu_available,
     is_torchaudio_available,
     is_torchdynamo_available,
+    is_torchvision_available,
     is_vision_available,
 )
 
@@ -281,6 +289,16 @@ def require_timm(test_case):
     return unittest.skipUnless(is_timm_available(), "test requires Timm")(test_case)
 
 
+def require_natten(test_case):
+    """
+    Decorator marking a test that requires NATTEN.
+
+    These tests are skipped when NATTEN isn't installed.
+
+    """
+    return unittest.skipUnless(is_natten_available(), "test requires natten")(test_case)
+
+
 def require_torch(test_case):
     """
     Decorator marking a test that requires PyTorch.
@@ -289,6 +307,16 @@ def require_torch(test_case):
 
     """
     return unittest.skipUnless(is_torch_available(), "test requires PyTorch")(test_case)
+
+
+def require_torchvision(test_case):
+    """
+    Decorator marking a test that requires Torchvision.
+
+    These tests are skipped when Torchvision isn't installed.
+
+    """
+    return unittest.skipUnless(is_torchvision_available(), "test requires Torchvision")(test_case)
 
 
 def require_torch_or_tf(test_case):
@@ -380,6 +408,13 @@ def require_tensorflow_text(test_case):
     return unittest.skipUnless(is_tensorflow_text_available(), "test requires tensorflow_text")(test_case)
 
 
+def require_keras_nlp(test_case):
+    """
+    Decorator marking a test that requires keras_nlp. These tests are skipped when keras_nlp isn't installed.
+    """
+    return unittest.skipUnless(is_keras_nlp_available(), "test requires keras_nlp")(test_case)
+
+
 def require_pandas(test_case):
     """
     Decorator marking a test that requires pandas. These tests are skipped when pandas isn't installed.
@@ -426,6 +461,13 @@ def require_spacy(test_case):
     return unittest.skipUnless(is_spacy_available(), "test requires spacy")(test_case)
 
 
+def require_decord(test_case):
+    """
+    Decorator marking a test that requires decord. These tests are skipped when decord isn't installed.
+    """
+    return unittest.skipUnless(is_decord_available(), "test requires decord")(test_case)
+
+
 def require_torch_multi_gpu(test_case):
     """
     Decorator marking a test that requires a multi-GPU setup (in PyTorch). These tests are skipped on a machine without
@@ -470,6 +512,15 @@ def require_torch_tpu(test_case):
     Decorator marking a test that requires a TPU (in PyTorch).
     """
     return unittest.skipUnless(is_torch_tpu_available(check_device=False), "test requires PyTorch TPU")(test_case)
+
+
+def require_torch_neuroncore(test_case):
+    """
+    Decorator marking a test that requires NeuronCore (in PyTorch).
+    """
+    return unittest.skipUnless(is_torch_neuroncore_available(check_device=False), "test requires PyTorch NeuronCore")(
+        test_case
+    )
 
 
 if is_torch_available():
@@ -579,6 +630,16 @@ def require_wandb(test_case):
     return unittest.skipUnless(is_wandb_available(), "test requires wandb")(test_case)
 
 
+def require_clearml(test_case):
+    """
+    Decorator marking a test requires clearml.
+
+    These tests are skipped when clearml isn't installed.
+
+    """
+    return unittest.skipUnless(is_clearml_available(), "test requires clearml")(test_case)
+
+
 def require_soundfile(test_case):
     """
     Decorator marking a test that requires soundfile
@@ -663,6 +724,13 @@ def require_jumanpp(test_case):
     return unittest.skipUnless(is_jumanpp_available(), "test requires jumanpp")(test_case)
 
 
+def require_cython(test_case):
+    """
+    Decorator marking a test that requires jumanpp
+    """
+    return unittest.skipUnless(is_cython_available(), "test requires cython")(test_case)
+
+
 def get_gpu_count():
     """
     Return the number of available gpus (regardless of whether torch, tf or jax is used)
@@ -710,6 +778,7 @@ def get_tests_dir(append_path=None):
 # Helper functions for dealing with testing text outputs
 # The original code came from:
 # https://github.com/fastai/fastai/blob/master/tests/utils/text.py
+
 
 # When any function contains print() calls that get overwritten, like progress bars,
 # a special care needs to be applied, since under pytest -s captured output (capsys
@@ -1623,7 +1692,7 @@ class RequestCounter:
         return self.old_request(method=method, **kwargs)
 
 
-def is_flaky(max_attempts: int = 5, wait_before_retry: Optional[float] = None):
+def is_flaky(max_attempts: int = 5, wait_before_retry: Optional[float] = None, description: Optional[str] = None):
     """
     To decorate flaky tests. They will be retried on failures.
 
@@ -1632,6 +1701,9 @@ def is_flaky(max_attempts: int = 5, wait_before_retry: Optional[float] = None):
             The maximum number of attempts to retry the flaky test.
         wait_before_retry (`float`, *optional*):
             If provided, will wait that number of seconds before retrying the test.
+        description (`str`, *optional*):
+            A string to describe the situation (what / where / why is flaky, link to GH issue/PR comments, errors,
+            etc.)
     """
 
     def decorator(test_func_ref):
@@ -1656,7 +1728,7 @@ def is_flaky(max_attempts: int = 5, wait_before_retry: Optional[float] = None):
     return decorator
 
 
-def run_test_in_subprocess(test_case, target_func, inputs=None, timeout=600):
+def run_test_in_subprocess(test_case, target_func, inputs=None, timeout=None):
     """
     To run a test in a subprocess. In particular, this can avoid (GPU) memory issue.
 
@@ -1667,9 +1739,12 @@ def run_test_in_subprocess(test_case, target_func, inputs=None, timeout=600):
             The function implementing the actual testing logic.
         inputs (`dict`, *optional*, defaults to `None`):
             The inputs that will be passed to `target_func` through an (input) queue.
-        timeout (`int`, *optional*, defaults to 600):
-            The timeout (in seconds) that will be passed to the input and output queues.
+        timeout (`int`, *optional*, defaults to `None`):
+            The timeout (in seconds) that will be passed to the input and output queues. If not specified, the env.
+            variable `PYTEST_TIMEOUT` will be checked. If still `None`, its value will be set to `600`.
     """
+    if timeout is None:
+        timeout = int(os.environ.get("PYTEST_TIMEOUT", 600))
 
     start_methohd = "spawn"
     ctx = multiprocessing.get_context(start_methohd)

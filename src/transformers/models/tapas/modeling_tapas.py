@@ -19,7 +19,7 @@ import enum
 import math
 import os
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import torch
 import torch.utils.checkpoint
@@ -43,8 +43,6 @@ from .configuration_tapas import TapasConfig
 logger = logging.get_logger(__name__)
 
 _CONFIG_FOR_DOC = "TapasConfig"
-_TOKENIZER_FOR_DOC = "TapasTokenizer"
-_TOKENIZER_FOR_DOC = "google/tapas-base"
 _CHECKPOINT_FOR_DOC = "google/tapas-base"
 
 TAPAS_PRETRAINED_MODEL_ARCHIVE_LIST = [
@@ -291,7 +289,6 @@ class TapasEmbeddings(nn.Module):
             position_ids = position_ids.unsqueeze(0).expand(input_shape)
             # when self.config.reset_position_index_per_cell is set to True, create relative position embeddings
             if self.config.reset_position_index_per_cell:
-
                 # shape (batch_size, seq_len)
                 col_index = IndexMap(token_type_ids[:, :, 1], self.config.type_vocab_sizes[1], batch_dims=1)
                 # shape (batch_size, seq_len)
@@ -793,7 +790,7 @@ TAPAS_START_DOCSTRING = r"""
 TAPAS_INPUTS_DOCSTRING = r"""
     Args:
         input_ids (`torch.LongTensor` of shape `({0})`):
-            Indices of input sequence tokens in the vocabulary. Indices can be obtained using [`TapasTokenizer`]. See
+            Indices of input sequence tokens in the vocabulary. Indices can be obtained using [`AutoTokenizer`]. See
             [`PreTrainedTokenizer.encode`] and [`PreTrainedTokenizer.__call__`] for details.
 
             [What are input IDs?](../glossary#input-ids)
@@ -805,7 +802,7 @@ TAPAS_INPUTS_DOCSTRING = r"""
 
             [What are attention masks?](../glossary#attention-mask)
         token_type_ids (`torch.LongTensor` of shape `({0}, 7)`, *optional*):
-            Token indices that encode tabular structure. Indices can be obtained using [`TapasTokenizer`]. See this
+            Token indices that encode tabular structure. Indices can be obtained using [`AutoTokenizer`]. See this
             class for more info.
 
             [What are token type IDs?](../glossary#token-type-ids)
@@ -878,28 +875,28 @@ class TapasModel(TapasPreTrainedModel):
     @replace_return_docstrings(output_type=BaseModelOutputWithPooling, config_class=_CONFIG_FOR_DOC)
     def forward(
         self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        encoder_hidden_states=None,
-        encoder_attention_mask=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
-    ):
+        input_ids: Optional[torch.LongTensor] = None,
+        attention_mask: Optional[torch.FloatTensor] = None,
+        token_type_ids: Optional[torch.LongTensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        head_mask: Optional[torch.FloatTensor] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        encoder_hidden_states: Optional[torch.FloatTensor] = None,
+        encoder_attention_mask: Optional[torch.FloatTensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ) -> Union[Tuple, BaseModelOutputWithPooling]:
         r"""
         Returns:
 
         Examples:
 
         ```python
-        >>> from transformers import TapasTokenizer, TapasModel
+        >>> from transformers import AutoTokenizer, TapasModel
         >>> import pandas as pd
 
-        >>> tokenizer = TapasTokenizer.from_pretrained("google/tapas-base")
+        >>> tokenizer = AutoTokenizer.from_pretrained("google/tapas-base")
         >>> model = TapasModel.from_pretrained("google/tapas-base")
 
         >>> data = {
@@ -1013,20 +1010,20 @@ class TapasForMaskedLM(TapasPreTrainedModel):
     @replace_return_docstrings(output_type=MaskedLMOutput, config_class=_CONFIG_FOR_DOC)
     def forward(
         self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        encoder_hidden_states=None,
-        encoder_attention_mask=None,
-        labels=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
-        **kwargs
-    ):
+        input_ids: Optional[torch.LongTensor] = None,
+        attention_mask: Optional[torch.FloatTensor] = None,
+        token_type_ids: Optional[torch.LongTensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        head_mask: Optional[torch.FloatTensor] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        encoder_hidden_states: Optional[torch.FloatTensor] = None,
+        encoder_attention_mask: Optional[torch.FloatTensor] = None,
+        labels: Optional[torch.LongTensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+        **kwargs,
+    ) -> Union[Tuple, MaskedLMOutput]:
         r"""
         labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
             Labels for computing the masked language modeling loss. Indices should be in `[-100, 0, ...,
@@ -1038,10 +1035,10 @@ class TapasForMaskedLM(TapasPreTrainedModel):
         Examples:
 
         ```python
-        >>> from transformers import TapasTokenizer, TapasForMaskedLM
+        >>> from transformers import AutoTokenizer, TapasForMaskedLM
         >>> import pandas as pd
 
-        >>> tokenizer = TapasTokenizer.from_pretrained("google/tapas-base")
+        >>> tokenizer = AutoTokenizer.from_pretrained("google/tapas-base")
         >>> model = TapasForMaskedLM.from_pretrained("google/tapas-base")
 
         >>> data = {
@@ -1144,29 +1141,29 @@ class TapasForQuestionAnswering(TapasPreTrainedModel):
     @replace_return_docstrings(output_type=TableQuestionAnsweringOutput, config_class=_CONFIG_FOR_DOC)
     def forward(
         self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        table_mask=None,
-        labels=None,
-        aggregation_labels=None,
-        float_answer=None,
-        numeric_values=None,
-        numeric_values_scale=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
-    ):
+        input_ids: Optional[torch.LongTensor] = None,
+        attention_mask: Optional[torch.FloatTensor] = None,
+        token_type_ids: Optional[torch.LongTensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        head_mask: Optional[torch.FloatTensor] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        table_mask: Optional[torch.LongTensor] = None,
+        labels: Optional[torch.LongTensor] = None,
+        aggregation_labels: Optional[torch.LongTensor] = None,
+        float_answer: Optional[torch.FloatTensor] = None,
+        numeric_values: Optional[torch.FloatTensor] = None,
+        numeric_values_scale: Optional[torch.FloatTensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ) -> Union[Tuple, TableQuestionAnsweringOutput]:
         r"""
         table_mask (`torch.LongTensor` of shape `(batch_size, seq_length)`, *optional*):
             Mask for the table. Indicates which tokens belong to the table (1). Question tokens, table headers and
             padding are 0.
         labels (`torch.LongTensor` of shape `(batch_size, seq_length)`, *optional*):
             Labels per token for computing the hierarchical cell selection loss. This encodes the positions of the
-            answer appearing in the table. Can be obtained using [`TapasTokenizer`].
+            answer appearing in the table. Can be obtained using [`AutoTokenizer`].
 
             - 1 for tokens that are **part of the answer**,
             - 0 for tokens that are **not part of the answer**.
@@ -1180,10 +1177,10 @@ class TapasForQuestionAnswering(TapasPreTrainedModel):
             required in case of weak supervision (WTQ) to calculate the aggregate mask and regression loss.
         numeric_values (`torch.FloatTensor` of shape `(batch_size, seq_length)`, *optional*):
             Numeric values of every token, NaN for tokens which are not numeric values. Can be obtained using
-            [`TapasTokenizer`]. Only required in case of weak supervision for aggregation (WTQ) to calculate the
+            [`AutoTokenizer`]. Only required in case of weak supervision for aggregation (WTQ) to calculate the
             regression loss.
         numeric_values_scale (`torch.FloatTensor` of shape `(batch_size, seq_length)`, *optional*):
-            Scale of the numeric values of every token. Can be obtained using [`TapasTokenizer`]. Only required in case
+            Scale of the numeric values of every token. Can be obtained using [`AutoTokenizer`]. Only required in case
             of weak supervision for aggregation (WTQ) to calculate the regression loss.
 
         Returns:
@@ -1191,10 +1188,10 @@ class TapasForQuestionAnswering(TapasPreTrainedModel):
         Examples:
 
         ```python
-        >>> from transformers import TapasTokenizer, TapasForQuestionAnswering
+        >>> from transformers import AutoTokenizer, TapasForQuestionAnswering
         >>> import pandas as pd
 
-        >>> tokenizer = TapasTokenizer.from_pretrained("google/tapas-base-finetuned-wtq")
+        >>> tokenizer = AutoTokenizer.from_pretrained("google/tapas-base-finetuned-wtq")
         >>> model = TapasForQuestionAnswering.from_pretrained("google/tapas-base-finetuned-wtq")
 
         >>> data = {
@@ -1466,17 +1463,17 @@ class TapasForSequenceClassification(TapasPreTrainedModel):
     @replace_return_docstrings(output_type=SequenceClassifierOutput, config_class=_CONFIG_FOR_DOC)
     def forward(
         self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        labels=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
-    ):
+        input_ids: Optional[torch.LongTensor] = None,
+        attention_mask: Optional[torch.FloatTensor] = None,
+        token_type_ids: Optional[torch.LongTensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        head_mask: Optional[torch.FloatTensor] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        labels: Optional[torch.LongTensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ) -> Union[Tuple[torch.Tensor], SequenceClassifierOutput]:
         r"""
         labels (`torch.LongTensor` of shape `(batch_size,)`, *optional*):
             Labels for computing the sequence classification/regression loss. Indices should be in `[0, ...,
@@ -1489,11 +1486,11 @@ class TapasForSequenceClassification(TapasPreTrainedModel):
         Examples:
 
         ```python
-        >>> from transformers import TapasTokenizer, TapasForSequenceClassification
+        >>> from transformers import AutoTokenizer, TapasForSequenceClassification
         >>> import torch
         >>> import pandas as pd
 
-        >>> tokenizer = TapasTokenizer.from_pretrained("google/tapas-base-finetuned-tabfact")
+        >>> tokenizer = AutoTokenizer.from_pretrained("google/tapas-base-finetuned-tabfact")
         >>> model = TapasForSequenceClassification.from_pretrained("google/tapas-base-finetuned-tabfact")
 
         >>> data = {
@@ -1784,9 +1781,9 @@ def _segment_reduce(values, index, segment_reduce_fn, name):
     # changed "view" by "reshape" in the following line
     flat_values = values.reshape(flattened_shape.tolist())
 
-    out = torch.zeros(int(flat_index.num_segments), dtype=flat_values.dtype)
+    out = torch.zeros(int(flat_index.num_segments), dtype=torch.float, device=flat_values.device)
     segment_means = out.scatter_reduce(
-        dim=0, index=flat_index.indices.long(), src=flat_values, reduce=segment_reduce_fn, include_self=False
+        dim=0, index=flat_index.indices.long(), src=flat_values.float(), reduce=segment_reduce_fn, include_self=False
     )
 
     # Unflatten the values.
@@ -1799,7 +1796,7 @@ def _segment_reduce(values, index, segment_reduce_fn, name):
         dim=0,
     )
 
-    output_values = segment_means.clone().view(new_shape.tolist())
+    output_values = segment_means.clone().view(new_shape.tolist()).to(values.dtype)
     output_index = range_index_map(index.batch_shape(), index.num_segments)
     return output_values, output_index
 

@@ -36,7 +36,7 @@ from ...image_utils import (
     ChannelDimension,
     ImageInput,
     PILImageResampling,
-    is_batched,
+    make_list_of_images,
     to_numpy_array,
     valid_images,
 )
@@ -103,13 +103,13 @@ class MobileNetV2ImageProcessor(BaseImageProcessor):
         do_normalize: bool = True,
         image_mean: Optional[Union[float, List[float]]] = None,
         image_std: Optional[Union[float, List[float]]] = None,
-        **kwargs
+        **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         size = size if size is not None else {"shortest_edge": 256}
         size = get_size_dict(size, default_to_square=False)
         crop_size = crop_size if crop_size is not None else {"height": 224, "width": 224}
-        crop_size = get_size_dict(crop_size)
+        crop_size = get_size_dict(crop_size, param_name="crop_size")
         self.do_resize = do_resize
         self.size = size
         self.resample = resample
@@ -127,7 +127,7 @@ class MobileNetV2ImageProcessor(BaseImageProcessor):
         size: Dict[str, int],
         resample: PILImageResampling = PILImageResampling.BICUBIC,
         data_format: Optional[Union[str, ChannelDimension]] = None,
-        **kwargs
+        **kwargs,
     ) -> np.ndarray:
         """
         Resize an image. The shortest edge of the image is resized to size["shortest_edge"], with the longest edge
@@ -154,7 +154,7 @@ class MobileNetV2ImageProcessor(BaseImageProcessor):
         image: np.ndarray,
         size: Dict[str, int],
         data_format: Optional[Union[str, ChannelDimension]] = None,
-        **kwargs
+        **kwargs,
     ) -> np.ndarray:
         """
         Center crop an image to (size["height"], size["width"]). If the input size is smaller than `size` along any
@@ -169,6 +169,8 @@ class MobileNetV2ImageProcessor(BaseImageProcessor):
                 The channel dimension format of the image. If not provided, it will be the same as the input image.
         """
         size = get_size_dict(size)
+        if "height" not in size or "width" not in size:
+            raise ValueError(f"The `size` parameter must contain the keys `height` and `width`. Got {size.keys()}")
         return center_crop(image, size=(size["height"], size["width"]), data_format=data_format, **kwargs)
 
     def rescale(
@@ -199,7 +201,7 @@ class MobileNetV2ImageProcessor(BaseImageProcessor):
         mean: Union[float, List[float]],
         std: Union[float, List[float]],
         data_format: Optional[Union[str, ChannelDimension]] = None,
-        **kwargs
+        **kwargs,
     ) -> np.ndarray:
         """
         Normalize an image. image = (image - image_mean) / image_std.
@@ -286,15 +288,14 @@ class MobileNetV2ImageProcessor(BaseImageProcessor):
         resample = resample if resample is not None else self.resample
         do_center_crop = do_center_crop if do_center_crop is not None else self.do_center_crop
         crop_size = crop_size if crop_size is not None else self.crop_size
-        crop_size = get_size_dict(crop_size)
+        crop_size = get_size_dict(crop_size, param_name="crop_size")
         do_rescale = do_rescale if do_rescale is not None else self.do_rescale
         rescale_factor = rescale_factor if rescale_factor is not None else self.rescale_factor
         do_normalize = do_normalize if do_normalize is not None else self.do_normalize
         image_mean = image_mean if image_mean is not None else self.image_mean
         image_std = image_std if image_std is not None else self.image_std
 
-        if not is_batched(images):
-            images = [images]
+        images = make_list_of_images(images)
 
         if not valid_images(images):
             raise ValueError(

@@ -30,7 +30,7 @@ from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 from ...activations import ACT2FN
 from ...modeling_outputs import BaseModelOutputWithCrossAttentions
 from ...modeling_utils import PreTrainedModel
-from ...pytorch_utils import apply_chunking_to_forward, find_pruneable_heads_and_indices, prune_linear_layer
+from ...pytorch_utils import apply_chunking_to_forward, find_pruneable_heads_and_indices, meshgrid, prune_linear_layer
 from ...utils import (
     ModelOutput,
     add_start_docstrings,
@@ -50,7 +50,6 @@ logger = logging.get_logger(__name__)
 
 _CHECKPOINT_FOR_DOC = "deepmind/language-perceiver"
 _CONFIG_FOR_DOC = "PerceiverConfig"
-_TOKENIZER_FOR_DOC = "PerceiverTokenizer"
 
 PERCEIVER_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "deepmind/language-perceiver",
@@ -768,7 +767,7 @@ class PerceiverModel(PerceiverPreTrainedModel):
         Examples:
 
         ```python
-        >>> from transformers import PerceiverConfig, PerceiverTokenizer, PerceiverFeatureExtractor, PerceiverModel
+        >>> from transformers import PerceiverConfig, PerceiverTokenizer, PerceiverImageProcessor, PerceiverModel
         >>> from transformers.models.perceiver.modeling_perceiver import (
         ...     PerceiverTextPreprocessor,
         ...     PerceiverImagePreprocessor,
@@ -839,10 +838,10 @@ class PerceiverModel(PerceiverPreTrainedModel):
         ... )
 
         >>> # you can then do a forward pass as follows:
-        >>> feature_extractor = PerceiverFeatureExtractor()
+        >>> image_processor = PerceiverImageProcessor()
         >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
         >>> image = Image.open(requests.get(url, stream=True).raw)
-        >>> inputs = feature_extractor(image, return_tensors="pt").pixel_values
+        >>> inputs = image_processor(image, return_tensors="pt").pixel_values
 
         >>> with torch.no_grad():
         ...     outputs = model(inputs=inputs)
@@ -878,7 +877,7 @@ class PerceiverModel(PerceiverPreTrainedModel):
 
         # If no attention mask is provided, make them all ones
         if attention_mask is None:
-            attention_mask = torch.ones(((batch_size, seq_length)), device=device)
+            attention_mask = torch.ones((batch_size, seq_length), device=device)
         # Make the attention mask broadcastable to [batch_size, num_heads, seq_length, seq_length]
         extended_attention_mask = self.invert_attention_mask(attention_mask)
 
@@ -912,7 +911,7 @@ class PerceiverModel(PerceiverPreTrainedModel):
                     "label": 1,
                 }
             else:
-                output_modality_sizes = None
+                output_modality_sizes = modality_sizes
             decoder_query = self.decoder.decoder_query(
                 inputs, modality_sizes, inputs_without_pos, subsampled_points=subsampled_output_points
             )
@@ -953,7 +952,7 @@ class PerceiverModel(PerceiverPreTrainedModel):
 
 @add_start_docstrings("""Example use of Perceiver for masked language modeling.""", PERCEIVER_START_DOCSTRING)
 class PerceiverForMaskedLM(PerceiverPreTrainedModel):
-    def __init__(self, config):
+    def __init__(self, config: PerceiverConfig):
         super().__init__(config)
 
         text_preprocessor = PerceiverTextPreprocessor(config)
@@ -1007,10 +1006,10 @@ class PerceiverForMaskedLM(PerceiverPreTrainedModel):
         Examples:
 
         ```python
-        >>> from transformers import PerceiverTokenizer, PerceiverForMaskedLM
+        >>> from transformers import AutoTokenizer, PerceiverForMaskedLM
         >>> import torch
 
-        >>> tokenizer = PerceiverTokenizer.from_pretrained("deepmind/language-perceiver")
+        >>> tokenizer = AutoTokenizer.from_pretrained("deepmind/language-perceiver")
         >>> model = PerceiverForMaskedLM.from_pretrained("deepmind/language-perceiver")
 
         >>> # training
@@ -1131,9 +1130,9 @@ class PerceiverForSequenceClassification(PerceiverPreTrainedModel):
         Examples:
 
         ```python
-        >>> from transformers import PerceiverTokenizer, PerceiverForSequenceClassification
+        >>> from transformers import AutoTokenizer, PerceiverForSequenceClassification
 
-        >>> tokenizer = PerceiverTokenizer.from_pretrained("deepmind/language-perceiver")
+        >>> tokenizer = AutoTokenizer.from_pretrained("deepmind/language-perceiver")
         >>> model = PerceiverForSequenceClassification.from_pretrained("deepmind/language-perceiver")
 
         >>> text = "hello world"
@@ -1266,17 +1265,17 @@ class PerceiverForImageClassificationLearned(PerceiverPreTrainedModel):
         Examples:
 
         ```python
-        >>> from transformers import PerceiverFeatureExtractor, PerceiverForImageClassificationLearned
+        >>> from transformers import AutoImageProcessor, PerceiverForImageClassificationLearned
         >>> from PIL import Image
         >>> import requests
 
         >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
         >>> image = Image.open(requests.get(url, stream=True).raw)
 
-        >>> feature_extractor = PerceiverFeatureExtractor.from_pretrained("deepmind/vision-perceiver-learned")
+        >>> image_processor = AutoImageProcessor.from_pretrained("deepmind/vision-perceiver-learned")
         >>> model = PerceiverForImageClassificationLearned.from_pretrained("deepmind/vision-perceiver-learned")
 
-        >>> inputs = feature_extractor(images=image, return_tensors="pt").pixel_values
+        >>> inputs = image_processor(images=image, return_tensors="pt").pixel_values
         >>> outputs = model(inputs=inputs)
         >>> logits = outputs.logits
         >>> list(logits.shape)
@@ -1407,17 +1406,17 @@ class PerceiverForImageClassificationFourier(PerceiverPreTrainedModel):
         Examples:
 
         ```python
-        >>> from transformers import PerceiverFeatureExtractor, PerceiverForImageClassificationFourier
+        >>> from transformers import AutoImageProcessor, PerceiverForImageClassificationFourier
         >>> from PIL import Image
         >>> import requests
 
         >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
         >>> image = Image.open(requests.get(url, stream=True).raw)
 
-        >>> feature_extractor = PerceiverFeatureExtractor.from_pretrained("deepmind/vision-perceiver-fourier")
+        >>> image_processor = AutoImageProcessor.from_pretrained("deepmind/vision-perceiver-fourier")
         >>> model = PerceiverForImageClassificationFourier.from_pretrained("deepmind/vision-perceiver-fourier")
 
-        >>> inputs = feature_extractor(images=image, return_tensors="pt").pixel_values
+        >>> inputs = image_processor(images=image, return_tensors="pt").pixel_values
         >>> outputs = model(inputs=inputs)
         >>> logits = outputs.logits
         >>> list(logits.shape)
@@ -1548,17 +1547,17 @@ class PerceiverForImageClassificationConvProcessing(PerceiverPreTrainedModel):
         Examples:
 
         ```python
-        >>> from transformers import PerceiverFeatureExtractor, PerceiverForImageClassificationConvProcessing
+        >>> from transformers import AutoImageProcessor, PerceiverForImageClassificationConvProcessing
         >>> from PIL import Image
         >>> import requests
 
         >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
         >>> image = Image.open(requests.get(url, stream=True).raw)
 
-        >>> feature_extractor = PerceiverFeatureExtractor.from_pretrained("deepmind/vision-perceiver-conv")
+        >>> image_processor = AutoImageProcessor.from_pretrained("deepmind/vision-perceiver-conv")
         >>> model = PerceiverForImageClassificationConvProcessing.from_pretrained("deepmind/vision-perceiver-conv")
 
-        >>> inputs = feature_extractor(images=image, return_tensors="pt").pixel_values
+        >>> inputs = image_processor(images=image, return_tensors="pt").pixel_values
         >>> outputs = model(inputs=inputs)
         >>> logits = outputs.logits
         >>> list(logits.shape)
@@ -1778,7 +1777,7 @@ Note that, by masking the classification label during evaluation (i.e. simply pr
     PERCEIVER_START_DOCSTRING,
 )
 class PerceiverForMultimodalAutoencoding(PerceiverPreTrainedModel):
-    def __init__(self, config):
+    def __init__(self, config: PerceiverConfig):
         super().__init__(config)
 
         n_audio_samples = config.num_frames * config.audio_samples_per_frame
@@ -2124,7 +2123,7 @@ class PerceiverBasicDecoder(PerceiverAbstractDecoder):
 
         self.output_num_channels = output_num_channels
         # If `none`, the decoder will not construct any position encodings.
-        # You should construct your own when quering the decoder.
+        # You should construct your own when querying the decoder.
         self.output_position_encodings = None
         self.position_encoding_type = position_encoding_type
         self.position_encoding_kwargs = position_encoding_kwargs
@@ -2443,7 +2442,7 @@ class PerceiverMultimodalDecoder(PerceiverAbstractDecoder):
         output_num_channels: int,
         min_padding_size: Optional[int] = 2,
         subsampled_index_dims: Optional[Dict[str, PerceiverAbstractDecoder]] = None,
-        **decoder_kwargs
+        **decoder_kwargs,
     ) -> None:
         super().__init__()
         self.modalities = nn.ModuleDict(modalities)
@@ -2704,7 +2703,7 @@ def build_linear_positions(index_dims, output_range=(-1.0, 1.0)):
         return torch.linspace(start=output_range[0], end=output_range[1], steps=n_xels_per_dim, dtype=torch.float32)
 
     dim_ranges = [_linspace(n_xels_per_dim) for n_xels_per_dim in index_dims]
-    array_index_grid = torch.meshgrid(*dim_ranges)
+    array_index_grid = meshgrid(*dim_ranges, indexing="ij")
 
     return torch.stack(array_index_grid, dim=-1)
 
@@ -2850,14 +2849,14 @@ class PerceiverTextPreprocessor(AbstractPreprocessor):
     def num_channels(self) -> int:
         return self.config.d_model
 
-    def forward(self, inputs: torch.LongTensor) -> torch.FloatTensor:
-        embeddings = self.embeddings(inputs)
+    def forward(self, inputs: torch.LongTensor, pos: Optional[torch.Tensor] = None, network_input_is_1d: bool = True):
+        embeddings_without_pos = self.embeddings(inputs)
 
         seq_length = inputs.shape[1]
         position_ids = torch.arange(0, seq_length, device=inputs.device)
-        embeddings = embeddings + self.position_embeddings(position_ids)
+        embeddings = embeddings_without_pos + self.position_embeddings(position_ids)
 
-        return embeddings, None, None
+        return embeddings, None, embeddings_without_pos
 
 
 class PerceiverEmbeddingDecoder(nn.Module):
@@ -2890,7 +2889,7 @@ class PerceiverMultimodalPostprocessor(nn.Module):
     postprocessor.
 
     Args:
-          modalities (`Dict[str, PostprocessorType]`):
+          modalities (`Mapping[str, PostprocessorType]`):
             Dictionary mapping modality name to postprocessor class for that modality.
           input_is_dict (`bool`, *optional*, defaults to `False`):
             If True, input is assumed to be dictionary structured, and outputs keep the same dictionary shape. If
@@ -3203,9 +3202,9 @@ class PerceiverImagePreprocessor(AbstractPreprocessor):
         if self.prep_type != "patches":
             # move channels to last dimension, as the _build_network_inputs method below expects this
             if inputs.ndim == 4:
-                inputs = torch.permute(inputs, (0, 2, 3, 1))
+                inputs = inputs.permute(0, 2, 3, 1)
             elif inputs.ndim == 5:
-                inputs = torch.permute(inputs, (0, 1, 3, 4, 2))
+                inputs = inputs.permute(0, 1, 3, 4, 2)
             else:
                 raise ValueError("Unsupported data format for conv1x1.")
 
@@ -3346,7 +3345,7 @@ class PerceiverMultimodalPreprocessor(AbstractPreprocessor):
     of channels.
 
     Args:
-        modalities (`Dict[str, PreprocessorType]`):
+        modalities (`Mapping[str, PreprocessorType]`):
             Dict mapping modality name to preprocessor.
         mask_probs (`Dict[str, float]`):
             Dict mapping modality name to masking probability of that modality.
@@ -3362,7 +3361,7 @@ class PerceiverMultimodalPreprocessor(AbstractPreprocessor):
         min_padding_size: int = 2,
     ):
         super().__init__()
-        self.modalities = modalities
+        self.modalities = nn.ModuleDict(modalities)
         self.min_padding_size = min_padding_size
         self.mask_probs = mask_probs if mask_probs is not None else dict()
         self.padding = nn.ParameterDict(
